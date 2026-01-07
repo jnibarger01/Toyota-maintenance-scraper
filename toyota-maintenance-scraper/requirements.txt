@@ -1,0 +1,10 @@
+# Toyota Maintenance Data Scraper - Dependencies
+
+# HTTP client with connection pooling and async support
+httpx>=0.25.0
+
+# PDF text extraction (optional, pdftotext used via subprocess)
+# pdfplumber>=0.10.0  # Alternative if pdftotext not available
+
+# For data validation (optional)
+# pydantic>=2.0.0
