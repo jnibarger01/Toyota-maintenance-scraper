@@ -1,0 +1,238 @@
+/* =========================================================================
+   Toyota Maintenance Dashboard - Custom Styles
+   ========================================================================= */
+
+/* ---------------------------------------------------------------------------
+   Category Badges
+   --------------------------------------------------------------------------- */
+
+.category-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.category-standard {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.category-inspection {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.category-special_condition {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+/* ---------------------------------------------------------------------------
+   Condition Badges (special operating conditions)
+   --------------------------------------------------------------------------- */
+
+.condition-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  vertical-align: middle;
+}
+
+/* ---------------------------------------------------------------------------
+   Spec Cards
+   --------------------------------------------------------------------------- */
+
+.spec-card {
+  transition: box-shadow 0.15s ease;
+}
+
+.spec-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ---------------------------------------------------------------------------
+   Smooth Transitions
+   --------------------------------------------------------------------------- */
+
+.tab-panel {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vehicle-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.vehicle-card:hover {
+  transform: translateY(-1px);
+}
+
+/* ---------------------------------------------------------------------------
+   Compare Table
+   --------------------------------------------------------------------------- */
+
+.compare-table td {
+  vertical-align: top;
+}
+
+/* ---------------------------------------------------------------------------
+   Urgency Color Coding for Mileage Intervals
+   --------------------------------------------------------------------------- */
+
+/* These classes can be applied by JS based on interval urgency */
+.urgency-low {
+  border-left: 3px solid #86efac;
+}
+
+.urgency-medium {
+  border-left: 3px solid #fbbf24;
+}
+
+.urgency-high {
+  border-left: 3px solid #f87171;
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbar Styling
+   --------------------------------------------------------------------------- */
+
+.schedule-table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.schedule-table-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.schedule-table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.schedule-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ---------------------------------------------------------------------------
+   Print Styles
+   --------------------------------------------------------------------------- */
+
+@media print {
+  /* Hide non-essential UI */
+  header,
+  #selector,
+  #compare-panel,
+  #btn-compare,
+  #btn-print,
+  footer,
+  .tab-btn {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    font-size: 10pt;
+    color: black;
+  }
+
+  /* Show all tabs at once when printing */
+  .tab-panel {
+    display: block !important;
+    page-break-inside: avoid;
+  }
+
+  .tab-panel::before {
+    content: attr(data-panel);
+    display: block;
+    font-size: 14pt;
+    font-weight: bold;
+    text-transform: capitalize;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 4px;
+  }
+
+  .vehicle-card {
+    page-break-inside: avoid;
+    margin-bottom: 24px;
+    border: 1px solid #ccc;
+    box-shadow: none;
+  }
+
+  .card-header {
+    background: #333 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure tables break nicely */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  th,
+  td {
+    border-bottom: 1px solid #ddd;
+    padding: 4px 8px;
+  }
+
+  /* Category badges print-friendly */
+  .category-badge {
+    border: 1px solid #999;
+    background: none !important;
+    color: black !important;
+  }
+
+  .condition-badge {
+    border: 1px solid #999;
+    background: none !important;
+    color: black !important;
+  }
+
+  /* Page title */
+  @page {
+    margin: 0.75in;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Responsive Adjustments
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .card-header {
+    padding: 12px 16px;
+  }
+
+  .card-title {
+    font-size: 1rem;
+  }
+
+  .tab-btn {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+  }
+}
