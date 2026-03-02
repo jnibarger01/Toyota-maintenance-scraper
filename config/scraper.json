@@ -1,0 +1,10 @@
+{
+  "years": [2024, 2025],
+  "models": ["Camry", "RAV4", "Tacoma"],
+  "rate_limit": 1.0,
+  "timeout": 30,
+  "max_retries": 3,
+  "output_dir": "output",
+  "offline": false,
+  "source": ["toyota-pdf", "fueleconomy", "owners-manual"]
+}

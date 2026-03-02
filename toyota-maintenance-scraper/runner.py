@@ -17,7 +17,7 @@ import argparse
 import logging
 import sys
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from config import (
@@ -73,6 +73,7 @@ def scrape_toyota_pdfs(
     fetcher: Fetcher,
     storage: Storage,
     checkpoint: Checkpoint,
+    offline: bool = False,
 ) -> int:
     """
     Scrape Toyota maintenance PDFs.
@@ -92,6 +93,13 @@ def scrape_toyota_pdfs(
                 logger.debug(f"Skipping completed: {year} {model}")
                 continue
             
+            if offline:
+                logger.info(f"Offline mode: generating standard schedule for {year} Toyota {model}")
+                schedule = parser.get_standard_schedule(model, year, "")
+                schedules.append(schedule.to_dict())
+                checkpoint.mark_completed("toyota-pdf", model, year)
+                continue
+
             logger.info(f"Fetching {year} Toyota {model} maintenance PDF...")
             
             # Try primary URL
@@ -141,6 +149,7 @@ def scrape_fueleconomy(
     fetcher: Fetcher,
     storage: Storage,
     checkpoint: Checkpoint,
+    offline: bool = False,
 ) -> int:
     """
     Scrape FuelEconomy.gov API.
@@ -148,6 +157,10 @@ def scrape_fueleconomy(
     Returns number of vehicles collected.
     """
     logger.info("Starting FuelEconomy.gov scrape...")
+    if offline:
+        logger.info("Offline mode: skipping FuelEconomy.gov scrape")
+        return 0
+
     parser = FuelEconomyParser(fetcher)
     
     # Map our model names to FuelEconomy model patterns
@@ -218,6 +231,7 @@ def run_scraper(
     config: ScraperConfig,
     sources: Optional[List[str]] = None,
     resume: bool = True,
+    offline: bool = False,
 ) -> dict:
     """
     Run the scraper with given configuration.
@@ -234,12 +248,21 @@ def run_scraper(
     checkpoint = Checkpoint(config.output_dir)
     
     if not resume:
+        storage.reset_files([
+            "maintenance_schedules.jsonl",
+            "maintenance_schedules.csv",
+            "fueleconomy_vehicles.jsonl",
+            "fueleconomy_vehicles.csv",
+            "service_specs.jsonl",
+            "service_specs.csv",
+            "scrape_summary.json",
+        ])
         checkpoint.clear()
     
     checkpoint.start_session()
     
     stats = {
-        "started_at": datetime.utcnow().isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat(),
         "config": {
             "years": config.years,
             "models": config.models,
@@ -257,18 +280,18 @@ def run_scraper(
     ) as fetcher:
         
         if "toyota-pdf" in active_sources:
-            count = scrape_toyota_pdfs(config, fetcher, storage, checkpoint)
+            count = scrape_toyota_pdfs(config, fetcher, storage, checkpoint, offline=offline)
             stats["results"]["toyota-pdf"] = count
         
         if "fueleconomy" in active_sources:
-            count = scrape_fueleconomy(config, fetcher, storage, checkpoint)
+            count = scrape_fueleconomy(config, fetcher, storage, checkpoint, offline=offline)
             stats["results"]["fueleconomy"] = count
         
         if "owners-manual" in active_sources:
             count = scrape_owners_manuals(config, storage, checkpoint)
             stats["results"]["owners-manual"] = count
     
-    stats["completed_at"] = datetime.utcnow().isoformat()
+    stats["completed_at"] = datetime.now(timezone.utc).isoformat()
     
     # Export to CSV
     logger.info("Exporting to CSV...")
@@ -295,6 +318,11 @@ def main():
         "--smoke-test",
         action="store_true",
         help="Run quick test with minimal data",
+    )
+
+    parser.add_argument(
+        "--config",
+        help="Path to JSON/TOML config file",
     )
     
     parser.add_argument(
@@ -335,6 +363,26 @@ def main():
         default=1.0,
         help="Seconds between requests (default: 1.0)",
     )
+
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="HTTP timeout in seconds (default: 30)",
+    )
+
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=3,
+        help="Maximum HTTP retries (default: 3)",
+    )
+    
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Disable network fetches and use local/fallback generation only",
+    )
     
     parser.add_argument(
         "-v", "--verbose",
@@ -348,22 +396,50 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Build configuration
-    if args.smoke_test:
+    if args.config:
+        config = ScraperConfig.from_file(args.config)
+        if args.models:
+            config.models = args.models
+        if args.years:
+            config.years = args.years
+        if args.source:
+            config.source = args.source
+        if args.rate_limit != 1.0:
+            config.rate_limit = args.rate_limit
+        if args.timeout != 30:
+            config.timeout = args.timeout
+        if args.max_retries != 3:
+            config.max_retries = args.max_retries
+        if args.output_dir != "output":
+            config.output_dir = args.output_dir
+        if args.offline:
+            config.offline = True
+    elif args.smoke_test:
         config = ScraperConfig.smoke_test()
+        config.rate_limit = args.rate_limit
+        config.timeout = args.timeout
+        config.max_retries = args.max_retries
+        config.output_dir = args.output_dir
+        config.offline = args.offline
+        config.source = args.source or []
     else:
         config = ScraperConfig(
             years=args.years or YEARS,
             models=args.models or list(TOYOTA_MODELS.keys()),
             rate_limit=args.rate_limit,
+            timeout=args.timeout,
+            max_retries=args.max_retries,
             output_dir=args.output_dir,
+            offline=args.offline,
+            source=args.source or [],
         )
-    
-    # Validate models
-    invalid_models = [m for m in config.models if m not in TOYOTA_MODELS]
-    if invalid_models:
-        logger.warning(f"Unknown models: {invalid_models}")
-        logger.info(f"Valid models: {list(TOYOTA_MODELS.keys())}")
-    
+
+    try:
+        config.validate()
+    except ValueError as e:
+        logger.error(f"Invalid configuration: {e}")
+        sys.exit(2)
+
     logger.info(f"Configuration: {len(config.years)} years, {len(config.models)} models")
     logger.info(f"Output directory: {config.output_dir}")
     
@@ -371,8 +447,9 @@ def main():
     try:
         stats = run_scraper(
             config,
-            sources=args.source,
+            sources=config.source or args.source,
             resume=not args.no_resume,
+            offline=config.offline,
         )
         
         # Print summary

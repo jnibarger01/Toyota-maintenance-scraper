@@ -1,112 +1,86 @@
-# Toyota Maintenance Data Scraper
+# Toyota Maintenance Scraper
 
-A production-ready scraper that collects Toyota vehicle maintenance schedules from three official sources.
+Production-focused Toyota maintenance data scraper with CLI, checkpointing, offline fallback, and CSV/JSONL export.
 
-## Data Sources
+## Aegis (Safety & Compliance)
 
-| Source | Data Type | Method |
-|--------|-----------|--------|
-| Toyota Warranty & Maintenance PDFs | Maintenance schedules, intervals, service items | PDF download + parsing |
-| FuelEconomy.gov API | Vehicle specs (engine, MPG, drivetrain) | REST API |
-| Toyota Owner's Manuals | Supplementary maintenance details | PDF download + parsing |
+- **Source boundaries**: only public sources are used:
+  - Toyota public maintenance PDFs
+  - FuelEconomy.gov public API
+  - Non-authenticated owner-manual endpoint patterns (no login bypass)
+- **No credential scraping**: project does not automate authenticated owner portals.
+- **Rate limiting & retries**: conservative default pacing + exponential backoff.
+- **Secrets risk**: no API keys required. Still avoid committing local outputs containing private notes.
+- **Legal guardrails**:
+  - Respect site terms/robots and request pacing.
+  - Do not circumvent access controls.
+  - Use results for research/maintenance planning, not misrepresentation of OEM guidance.
 
-## Coverage
+## Project Layout
 
-- **Models**: All Toyota models (2018-2025)
-- **Data Points**: 
-  - Service intervals (5k, 10k, 15k... to 120k miles)
-  - Maintenance items per interval
-  - Special operating condition services
-  - Engine/drivetrain specifications
-  - Fuel economy data
+- `main.py` - repository entrypoint (delegates to app runner)
+- `toyota-maintenance-scraper/runner.py` - primary CLI
+- `toyota-maintenance-scraper/config.py` - models, URL patterns, config loader (JSON/TOML)
+- `toyota-maintenance-scraper/fetcher.py` - HTTP layer (rate-limit/retry)
+- `toyota-maintenance-scraper/parsers/` - source-specific parsers
+- `toyota-maintenance-scraper/storage.py` - JSONL/CSV + checkpointing
+- `toyota-maintenance-scraper/tests/` - unit/smoke tests
 
-## Project Structure
-
-```
-toyota-maintenance-scraper/
-├── config/
-│   ├── models.py          # Toyota model definitions 2018-2025
-│   └── settings.py        # Rate limits, paths, headers
-├── scrapers/
-│   ├── __init__.py
-│   ├── toyota_pdf.py      # Toyota maintenance PDF scraper
-│   ├── fueleconomy.py     # FuelEconomy.gov API client
-│   └── base.py            # Base scraper class
-├── parsers/
-│   ├── __init__.py
-│   └── maintenance_pdf.py # PDF text → structured data
-├── storage/
-│   ├── __init__.py
-│   └── writer.py          # JSONL/CSV output
-├── data/
-│   └── pdfs/              # Downloaded PDFs (gitignored)
-├── output/
-│   ├── maintenance.jsonl  # Primary output
-│   └── maintenance.csv    # CSV export
-├── main.py                # CLI entrypoint
-├── requirements.txt
-└── README.md
-```
-
-## Installation
+## Setup
 
 ```bash
-cd toyota-maintenance-scraper
+cd /home/jace/Toyota-maintenance-scraper/toyota-maintenance-scraper
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ## Usage
 
 ```bash
-# Full scrape (all models, all years)
-python main.py
+# run from repo root
+python main.py --smoke-test --offline
 
-# Smoke test (3 models, 1 year)
-python main.py --smoke-test
-
-# Specific model/year
-python main.py --model Camry --year 2024
-
-# Skip PDF download (use cached)
-python main.py --use-cache
+# run app directly
+python runner.py --smoke-test
+python runner.py --models Camry RAV4 --years 2023 2024
+python runner.py --source fueleconomy
+python runner.py --no-resume
 ```
 
-## Output Schema
+### Config file support
+
+```bash
+python runner.py --config config/scraper.json
+python runner.py --config config/scraper.toml --models Camry --years 2024
+```
+
+Example `scraper.json`:
 
 ```json
 {
-  "make": "Toyota",
-  "model": "Camry",
-  "year": 2024,
-  "engine": "2.5L 4-Cylinder",
-  "drivetrain": "FWD",
-  "fuel_type": "Regular Gasoline",
-  "mpg_city": 28,
-  "mpg_highway": 39,
-  "maintenance_schedule": [
-    {
-      "interval_miles": 5000,
-      "interval_months": 6,
-      "items": [
-        {"service": "Rotate tires", "category": "standard"},
-        {"service": "Inspect brake pads/discs", "category": "standard"},
-        {"service": "Replace engine oil and filter", "category": "special_condition", "condition": "dusty_roads"}
-      ]
-    }
-  ],
-  "source_pdf_url": "https://www.toyota.com/...",
-  "scraped_at": "2026-01-07T12:00:00Z"
+  "years": [2024, 2025],
+  "models": ["Camry", "RAV4"],
+  "rate_limit": 1.0,
+  "timeout": 30,
+  "max_retries": 3,
+  "output_dir": "output",
+  "offline": false,
+  "source": ["toyota-pdf", "fueleconomy", "owners-manual"]
 }
 ```
 
-## Rate Limits
+## Output
 
-- Toyota PDFs: 1 req/sec (conservative)
-- FuelEconomy.gov API: 2 req/sec (public API)
+- `maintenance_schedules.jsonl/.csv`
+- `fueleconomy_vehicles.jsonl/.csv`
+- `service_specs.jsonl/.csv`
+- `scrape_summary.json`
+- `.checkpoint.json`
 
-## Compliance
+## Verification
 
-- Respects robots.txt where applicable
-- Uses official public APIs and documents
-- No authentication bypass
-- Conservative rate limiting
+```bash
+python -m unittest discover -s tests -v
+python runner.py --smoke-test --offline --no-resume
+```
