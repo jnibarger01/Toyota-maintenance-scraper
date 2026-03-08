@@ -8,7 +8,7 @@ PYTEST  := $(VENV)/bin/python
 install: ## Create .venv and install requirements
 	$(PYTHON) -m venv $(VENV)
 	$(PIP) install --upgrade pip
-	$(PIP) install -r toyota-maintenance-scraper/requirements.txt
+	$(PIP) install -r requirements.txt
 
 test: ## Run full unittest suite
 	$(VENV)/bin/python -m unittest discover -s toyota-maintenance-scraper/tests -v

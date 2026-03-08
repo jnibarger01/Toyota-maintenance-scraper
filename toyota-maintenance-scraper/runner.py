@@ -63,7 +63,10 @@ def extract_pdf_text(pdf_content: bytes) -> Optional[str]:
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
     finally:
-        os.unlink(pdf_path)
+        try:
+            os.unlink(pdf_path)
+        except OSError:
+            pass
     
     return None
 
@@ -95,8 +98,9 @@ def scrape_toyota_pdfs(
             
             if offline:
                 logger.info(f"Offline mode: generating standard schedule for {year} Toyota {model}")
-                schedule = parser.get_standard_schedule(model, year, "")
-                schedules.append(schedule.to_dict())
+                schedule_dict = parser.get_standard_schedule(model, year, "").to_dict()
+                schedule_dict["data_source_type"] = "standard_generated"
+                schedules.append(schedule_dict)
                 checkpoint.mark_completed("toyota-pdf", model, year)
                 continue
 
@@ -116,20 +120,23 @@ def scrape_toyota_pdfs(
             if result.success and result.content:
                 # Extract text from PDF
                 text = extract_pdf_text(result.content)
-                
+
                 if text:
-                    schedule = parser.parse_pdf_text(text, model, year, url)
+                    schedule_dict = parser.parse_pdf_text(text, model, year, url).to_dict()
+                    schedule_dict["data_source_type"] = "pdf_parsed"
                 else:
                     # Fall back to standard schedule
                     logger.warning(f"Could not parse PDF text for {year} {model}, using standard schedule")
-                    schedule = parser.get_standard_schedule(model, year, url)
-                
-                schedules.append(schedule.to_dict())
+                    schedule_dict = parser.get_standard_schedule(model, year, url).to_dict()
+                    schedule_dict["data_source_type"] = "standard_generated"
+
+                schedules.append(schedule_dict)
             else:
                 # Generate standard schedule
                 logger.warning(f"PDF not available for {year} {model}, generating standard schedule")
-                schedule = parser.get_standard_schedule(model, year, url)
-                schedules.append(schedule.to_dict())
+                schedule_dict = parser.get_standard_schedule(model, year, url).to_dict()
+                schedule_dict["data_source_type"] = "standard_generated"
+                schedules.append(schedule_dict)
             
             checkpoint.mark_completed("toyota-pdf", model, year)
     

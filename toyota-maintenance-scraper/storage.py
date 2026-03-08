@@ -97,19 +97,23 @@ class Storage:
                             continue
         
         written = 0
+        skipped = 0
         with open(filepath, mode) as f:
             for record in records:
                 # Deduplication check
                 if key_fields:
                     key = self._make_key(record, key_fields)
                     if key in self._seen_keys[filename]:
+                        skipped += 1
                         logger.debug(f"Skipping duplicate: {key}")
                         continue
                     self._seen_keys[filename].add(key)
-                
+
                 f.write(json.dumps(record, default=str) + "\n")
                 written += 1
-        
+
+        if skipped:
+            logger.info(f"Skipped {skipped} duplicate record(s) in {filepath}")
         logger.info(f"Wrote {written} records to {filepath}")
         return written
     
@@ -189,12 +193,7 @@ class Storage:
             if isinstance(v, dict):
                 items.extend(self._flatten_dict(v, new_key, sep).items())
             elif isinstance(v, list):
-                # For lists, join as comma-separated string or expand
-                if v and isinstance(v[0], dict):
-                    # List of dicts - take first or summarize
-                    items.append((new_key, json.dumps(v)))
-                else:
-                    items.append((new_key, ", ".join(str(x) for x in v)))
+                items.append((new_key, json.dumps(v)))
             else:
                 items.append((new_key, v))
         
