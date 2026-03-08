@@ -83,11 +83,13 @@ class FuelEconomyParser:
             return result.json_data
 
         if not result.text:
+            logger.debug("Empty response body from FuelEconomy API")
             return {}
 
         try:
             root = ElementTree.fromstring(result.text)
-        except ElementTree.ParseError:
+        except ElementTree.ParseError as exc:
+            logger.warning("Failed to parse FuelEconomy response as XML: %s", exc)
             return {}
 
         def to_obj(node: ElementTree.Element) -> Any:

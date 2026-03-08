@@ -5,6 +5,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Dict, Any
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:  # Python 3.11+
     import tomllib  # type: ignore
@@ -96,6 +99,10 @@ class ScraperConfig:
             raise ValueError("Config file must be .json or .toml")
         if "scraper" in data and isinstance(data["scraper"], dict):
             data = data["scraper"]
+        known_keys = {"years", "models", "rate_limit", "timeout", "max_retries", "output_dir", "offline", "source"}
+        unknown = set(data.keys()) - known_keys
+        if unknown:
+            logger.warning(f"Unknown config keys (will be ignored): {unknown}")
         cfg = cls(
             years=data.get("years", YEARS),
             models=data.get("models", list(TOYOTA_MODELS.keys())),
