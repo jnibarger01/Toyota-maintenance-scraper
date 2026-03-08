@@ -29,10 +29,8 @@ Production-focused Toyota maintenance data scraper with CLI, checkpointing, offl
 ## Setup
 
 ```bash
-cd /home/jace/Toyota-maintenance-scraper/toyota-maintenance-scraper
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+cd /home/jace/Toyota-maintenance-scraper
+make install
 ```
 
 ## Usage
@@ -42,17 +40,17 @@ pip install -r requirements.txt
 python main.py --smoke-test --offline
 
 # run app directly
-python runner.py --smoke-test
-python runner.py --models Camry RAV4 --years 2023 2024
-python runner.py --source fueleconomy
-python runner.py --no-resume
+python toyota-maintenance-scraper/runner.py --smoke-test
+python toyota-maintenance-scraper/runner.py --models Camry RAV4 --years 2023 2024
+python toyota-maintenance-scraper/runner.py --source fueleconomy
+python toyota-maintenance-scraper/runner.py --no-resume
 ```
 
 ### Config file support
 
 ```bash
-python runner.py --config config/scraper.json
-python runner.py --config config/scraper.toml --models Camry --years 2024
+python main.py --config config/scraper.json
+python main.py --config config/scraper.toml --models Camry --years 2024
 ```
 
 Example `scraper.json`:
@@ -81,6 +79,6 @@ Example `scraper.json`:
 ## Verification
 
 ```bash
-python -m unittest discover -s tests -v
-python runner.py --smoke-test --offline --no-resume
+make test
+python main.py --smoke-test --offline --no-resume
 ```

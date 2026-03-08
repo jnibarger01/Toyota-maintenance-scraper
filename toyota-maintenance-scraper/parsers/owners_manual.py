@@ -8,7 +8,7 @@ import re
 import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +58,7 @@ class ServiceSpec:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        d = asdict(self)
-        d["fluids"] = [asdict(f) for f in self.fluids]
-        return d
+        return asdict(self)
 
 
 class OwnersManualParser:
@@ -106,6 +104,11 @@ class OwnersManualParser:
     
     def __init__(self):
         self.source = "owners-manual"
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        """Return timezone-aware UTC timestamp."""
+        return datetime.now(timezone.utc).isoformat()
     
     def parse_manual_text(self, text: str, model: str, year: int, url: str) -> ServiceSpec:
         """
@@ -125,7 +128,7 @@ class OwnersManualParser:
             model=model,
             year=year,
             source_url=url,
-            scraped_at=datetime.utcnow().isoformat() + "Z",
+            scraped_at=self._utc_now_iso(),
         )
         
         # Extract oil capacity
@@ -176,16 +179,17 @@ class OwnersManualParser:
         Used when PDF parsing fails - returns typical specs for the model category.
         """
         # Determine vehicle category
-        trucks = ["Tacoma", "Tundra"]
-        v6_models = ["Highlander", "4Runner", "Sequoia", "Sienna", "Avalon", "GR Supra"]
-        hybrids = ["Prius", "PriusPrime", "RAV4Prime", "bZ4X", "Mirai"]
+        model_key = model.lower().replace(" ", "")
+        trucks = {"tacoma", "tundra"}
+        v6_models = {"highlander", "4runner", "sequoia", "sienna", "avalon", "grsupra"}
+        hybrids = {"prius", "priusprime", "rav4prime", "bz4x", "mirai"}
         
         spec = ServiceSpec(
             source="owners-manual-standard",
             model=model,
             year=year,
             source_url=url,
-            scraped_at=datetime.utcnow().isoformat() + "Z",
+            scraped_at=self._utc_now_iso(),
         )
         
         # Set fluid specs based on category
@@ -195,15 +199,15 @@ class OwnersManualParser:
         spec.transmission_fluid = defaults["transmission_fluid"]
         spec.brake_fluid = defaults["brake_fluid"]
         
-        if model in trucks:
+        if model_key in trucks:
             spec.engine_oil_capacity = self.FLUID_SPECS["truck"]["engine_oil_capacity"]
-        elif model in v6_models:
+        elif model_key in v6_models:
             spec.engine_oil_capacity = self.FLUID_SPECS["v6"]["engine_oil_capacity"]
         else:
             spec.engine_oil_capacity = self.FLUID_SPECS["4cyl"]["engine_oil_capacity"]
         
         # Hybrids may use different oil
-        if model in hybrids:
+        if model_key in hybrids:
             spec.engine_oil_type = "0W-16 synthetic"
         
         # Add fluid details

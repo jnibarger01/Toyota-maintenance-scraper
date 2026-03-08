@@ -11,7 +11,7 @@ import csv
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,25 @@ class Storage:
     def _get_file_path(self, filename: str) -> Path:
         """Get full path for output file."""
         return self.output_dir / filename
+
+    def reset_files(self, filenames: Optional[List[str]] = None) -> None:
+        """
+        Remove output files to force a clean run.
+
+        Args:
+            filenames: Specific filenames to remove. If None, clear all files in output dir.
+        """
+        targets: List[Path]
+        if filenames is None:
+            targets = [p for p in self.output_dir.iterdir() if p.is_file()]
+        else:
+            targets = [self._get_file_path(name) for name in filenames]
+
+        for path in targets:
+            if path.exists() and path.is_file():
+                path.unlink()
+
+        self._seen_keys.clear()
     
     def _make_key(self, record: Dict[str, Any], key_fields: List[str]) -> str:
         """Generate deduplication key from record."""
@@ -238,7 +257,7 @@ class Checkpoint:
     def mark_completed(self, source: str, model: str, year: int) -> None:
         """Mark a model/year as completed."""
         key = f"{source}:{model}:{year}"
-        self._state["completed"][key] = datetime.utcnow().isoformat()
+        self._state["completed"][key] = datetime.now(timezone.utc).isoformat()
         self._save()
     
     def is_completed(self, source: str, model: str, year: int) -> bool:
@@ -248,7 +267,7 @@ class Checkpoint:
     
     def start_session(self) -> None:
         """Mark session start."""
-        self._state["started_at"] = datetime.utcnow().isoformat()
+        self._state["started_at"] = datetime.now(timezone.utc).isoformat()
         self._save()
     
     def get_progress(self) -> Dict[str, Any]:

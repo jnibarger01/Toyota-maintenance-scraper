@@ -11,7 +11,7 @@ try:  # Python 3.11+
 except Exception:  # pragma: no cover
     tomllib = None
 
-YEARS = list(range(2018, 2026))
+YEARS = list(range(2018, 2027))
 
 TOYOTA_MODELS: Dict[str, str] = {
     "Camry": "Camry", "Corolla": "Corolla", "CorollaHatchback": "Corolla Hatchback",
@@ -25,18 +25,18 @@ TOYOTA_MODELS: Dict[str, str] = {
 }
 
 MODEL_YEAR_AVAILABILITY: Dict[str, List[int]] = {
-    "Camry": list(range(2018, 2026)), "Corolla": list(range(2018, 2026)),
-    "CorollaHatchback": list(range(2019, 2026)), "Avalon": list(range(2018, 2025)),
-    "Prius": list(range(2018, 2026)), "PriusPrime": list(range(2018, 2026)),
-    "Mirai": list(range(2018, 2026)), "GR86": list(range(2022, 2026)),
-    "GRSupra": list(range(2020, 2026)), "Crown": list(range(2023, 2026)),
-    "RAV4": list(range(2018, 2026)), "RAV4Prime": list(range(2021, 2026)),
-    "Highlander": list(range(2018, 2026)), "HighlanderHybrid": list(range(2018, 2026)),
-    "GrandHighlander": list(range(2024, 2026)), "4Runner": list(range(2018, 2026)),
-    "Sequoia": list(range(2018, 2026)), "Venza": list(range(2021, 2026)),
-    "CHR": list(range(2018, 2023)), "CorollaCross": list(range(2022, 2026)),
-    "bZ4X": list(range(2023, 2026)), "LandCruiser": list(range(2018, 2022)) + list(range(2024, 2026)),
-    "Tacoma": list(range(2018, 2026)), "Tundra": list(range(2018, 2026)), "Sienna": list(range(2018, 2026)),
+    "Camry": list(range(2018, 2027)), "Corolla": list(range(2018, 2027)),
+    "CorollaHatchback": list(range(2019, 2027)), "Avalon": list(range(2018, 2025)),
+    "Prius": list(range(2018, 2027)), "PriusPrime": list(range(2018, 2027)),
+    "Mirai": list(range(2018, 2027)), "GR86": list(range(2022, 2027)),
+    "GRSupra": list(range(2020, 2027)), "Crown": list(range(2023, 2027)),
+    "RAV4": list(range(2018, 2027)), "RAV4Prime": list(range(2021, 2027)),
+    "Highlander": list(range(2018, 2027)), "HighlanderHybrid": list(range(2018, 2027)),
+    "GrandHighlander": list(range(2024, 2027)), "4Runner": list(range(2018, 2027)),
+    "Sequoia": list(range(2018, 2027)), "Venza": list(range(2021, 2027)),
+    "CHR": list(range(2018, 2023)), "CorollaCross": list(range(2022, 2027)),
+    "bZ4X": list(range(2023, 2027)), "LandCruiser": list(range(2018, 2022)) + list(range(2024, 2027)),
+    "Tacoma": list(range(2018, 2027)), "Tundra": list(range(2018, 2027)), "Sienna": list(range(2018, 2027)),
 }
 
 TOYOTA_PDF_BASE = "https://www.toyota.com/content/dam/toyota/brochures/pdf"

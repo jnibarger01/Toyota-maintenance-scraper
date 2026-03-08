@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -r toyota-maintenance-scraper/requirements.txt
+
+      - name: Lint (py_compile)
+        run: |
+          find toyota-maintenance-scraper -name "*.py" \
+            -not -path "*/__pycache__/*" \
+            -print0 | xargs -0 python -m py_compile
+          python -m py_compile main.py
+
+      - name: Run tests
+        run: python -m unittest discover -s toyota-maintenance-scraper/tests -v
+
+      - name: Smoke test (offline)
+        run: |
+          python main.py --smoke-test --offline --no-resume --output-dir output_ci

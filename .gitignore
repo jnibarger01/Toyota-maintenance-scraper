@@ -5,6 +5,11 @@ __pycache__/
 .pytest_cache/
 .venv/
 output/
+output_ci/
+output_review/
+output_test/
+toyota-maintenance-scraper/output_test/
 data/
+ops/*.log
 *.log
 .DS_Store

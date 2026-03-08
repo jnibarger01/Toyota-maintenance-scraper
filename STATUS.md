@@ -20,9 +20,23 @@
 - `python -m unittest discover -s tests -v` ✅
 - `python runner.py --smoke-test --offline --no-resume` ✅
 
+## CI / Developer Tooling
+
+- `.github/workflows/ci.yml` ✅ — Python 3.11 + 3.12 matrix; lint → test → offline smoke on every push/PR
+- `Makefile` ✅ — `make install / lint / test / smoke / run / clean`
+
+## Live Data Source Validation
+
+- FuelEconomy.gov API — **not yet validated** with real network calls.
+  Run: `python main.py --source fueleconomy --models Camry --years 2024 --no-resume`
+  Expected: records appear in `output/fueleconomy_vehicles.jsonl`
+- Toyota PDF URLs — **not yet validated**.
+  Run: `python main.py --source toyota-pdf --models Camry --years 2024 --no-resume`
+  Expected: either real PDF parsed or fallback standard schedule recorded (no crash)
+
 ## Gaps / Next Steps
 
-- Add CI workflow (lint + tests) to enforce gate automatically.
+- Validate live data sources (see above — manual run required).
 - Add fixture-based parser tests against sampled PDF text snippets.
 - Optionally add strict schema validation (pydantic/dataclasses-json).
 - Consider async fetch for larger full-run throughput.

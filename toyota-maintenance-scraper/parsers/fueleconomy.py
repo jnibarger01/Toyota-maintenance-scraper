@@ -7,7 +7,8 @@ API docs: https://www.fueleconomy.gov/feg/ws/
 import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
+from xml.etree import ElementTree
 
 from fetcher import Fetcher, FetchResult
 from config import FUELECONOMY_API_BASE
@@ -65,17 +66,57 @@ class FuelEconomyParser:
         self.fetcher = fetcher
         self.source = "fueleconomy"
         self.base_url = FUELECONOMY_API_BASE
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        """Return timezone-aware UTC timestamp."""
+        return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _normalize_payload(result: FetchResult) -> Dict[str, Any]:
+        """
+        Normalize FuelEconomy response into a dictionary.
+
+        The API may return JSON or XML depending on endpoint behavior.
+        """
+        if result.json_data:
+            return result.json_data
+
+        if not result.text:
+            return {}
+
+        try:
+            root = ElementTree.fromstring(result.text)
+        except ElementTree.ParseError:
+            return {}
+
+        def to_obj(node: ElementTree.Element) -> Any:
+            children = list(node)
+            if not children:
+                return (node.text or "").strip()
+
+            grouped: Dict[str, List[Any]] = {}
+            for child in children:
+                grouped.setdefault(child.tag, []).append(to_obj(child))
+
+            payload: Dict[str, Any] = {}
+            for key, values in grouped.items():
+                payload[key] = values[0] if len(values) == 1 else values
+            return payload
+
+        return to_obj(root)
     
     def get_years(self) -> List[int]:
         """Get available years from API."""
         url = f"{self.base_url}/vehicle/menu/year"
         result = self.fetcher.fetch_json(url)
-        
-        if not result.success or not result.json_data:
+
+        if not result.success:
             logger.error("Failed to fetch years")
             return []
-        
-        menu_items = result.json_data.get("menuItem", [])
+
+        payload = self._normalize_payload(result)
+        menu_items = payload.get("menuItem", [])
         if isinstance(menu_items, dict):
             menu_items = [menu_items]
         
@@ -85,12 +126,13 @@ class FuelEconomyParser:
         """Get available models for a year and make."""
         url = f"{self.base_url}/vehicle/menu/model"
         result = self.fetcher.fetch_json(url, params={"year": year, "make": make})
-        
-        if not result.success or not result.json_data:
+
+        if not result.success:
             logger.warning(f"Failed to fetch models for {year} {make}")
             return []
-        
-        menu_items = result.json_data.get("menuItem", [])
+
+        payload = self._normalize_payload(result)
+        menu_items = payload.get("menuItem", [])
         if isinstance(menu_items, dict):
             menu_items = [menu_items]
         
@@ -105,11 +147,12 @@ class FuelEconomyParser:
             "model": model,
         })
         
-        if not result.success or not result.json_data:
+        if not result.success:
             logger.warning(f"Failed to fetch options for {year} {make} {model}")
             return []
-        
-        menu_items = result.json_data.get("menuItem", [])
+
+        payload = self._normalize_payload(result)
+        menu_items = payload.get("menuItem", [])
         if isinstance(menu_items, dict):
             menu_items = [menu_items]
         
@@ -123,12 +166,13 @@ class FuelEconomyParser:
         """Get detailed vehicle info by ID."""
         url = f"{self.base_url}/vehicle/{vehicle_id}"
         result = self.fetcher.fetch_json(url)
-        
-        if not result.success or not result.json_data:
+
+        if not result.success:
             logger.warning(f"Failed to fetch vehicle {vehicle_id}")
             return None
-        
-        return result.json_data
+
+        payload = self._normalize_payload(result)
+        return payload if payload else None
     
     def parse_vehicle(self, data: Dict[str, Any]) -> VehicleSpec:
         """Parse API response into VehicleSpec."""
@@ -153,7 +197,7 @@ class FuelEconomyParser:
             annual_fuel_cost=self._safe_int(data.get("fuelCost08")),
             co2_tailpipe=self._safe_float(data.get("co2TailpipeGpm")),
             
-            scraped_at=datetime.utcnow().isoformat() + "Z",
+            scraped_at=self._utc_now_iso(),
         )
     
     def fetch_all_toyota_vehicles(

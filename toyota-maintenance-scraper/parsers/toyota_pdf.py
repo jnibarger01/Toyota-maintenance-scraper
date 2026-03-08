@@ -7,7 +7,7 @@ import re
 import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,11 @@ class ToyotaPDFParser:
     
     def __init__(self):
         self.source = "toyota-pdf"
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        """Return timezone-aware UTC timestamp."""
+        return datetime.now(timezone.utc).isoformat()
     
     def parse_pdf_text(self, text: str, model: str, year: int, url: str) -> MaintenanceSchedule:
         """
@@ -139,7 +144,7 @@ class ToyotaPDFParser:
             year=year,
             intervals=intervals,
             source_url=url,
-            scraped_at=datetime.utcnow().isoformat() + "Z",
+            scraped_at=self._utc_now_iso(),
         )
     
     def _split_by_intervals(self, text: str) -> List[tuple]:
@@ -307,5 +312,5 @@ class ToyotaPDFParser:
             year=year,
             intervals=intervals,
             source_url=url,
-            scraped_at=datetime.utcnow().isoformat() + "Z",
+            scraped_at=self._utc_now_iso(),
         )
