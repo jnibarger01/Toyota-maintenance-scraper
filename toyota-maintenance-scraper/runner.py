@@ -251,7 +251,7 @@ def run_scraper(
     Returns:
         Summary statistics
     """
-    storage = Storage(config.output_dir)
+    storage = Storage(config.output_dir, sqlite_path=config.sqlite_path)
     checkpoint = Checkpoint(config.output_dir)
     
     if not resume:
@@ -357,6 +357,12 @@ def main():
         default="output",
         help="Output directory (default: output)",
     )
+
+    parser.add_argument(
+        "--sqlite-path",
+        default="scraper.db",
+        help="SQLite file path (relative paths resolve under output-dir; default: scraper.db)",
+    )
     
     parser.add_argument(
         "--no-resume",
@@ -419,6 +425,8 @@ def main():
             config.max_retries = args.max_retries
         if args.output_dir != "output":
             config.output_dir = args.output_dir
+        if args.sqlite_path != "scraper.db":
+            config.sqlite_path = args.sqlite_path
         if args.offline:
             config.offline = True
     elif args.smoke_test:
@@ -427,6 +435,7 @@ def main():
         config.timeout = args.timeout
         config.max_retries = args.max_retries
         config.output_dir = args.output_dir
+        config.sqlite_path = args.sqlite_path
         config.offline = args.offline
         config.source = args.source or []
     else:
@@ -437,6 +446,7 @@ def main():
             timeout=args.timeout,
             max_retries=args.max_retries,
             output_dir=args.output_dir,
+            sqlite_path=args.sqlite_path,
             offline=args.offline,
             source=args.source or [],
         )
@@ -449,6 +459,7 @@ def main():
 
     logger.info(f"Configuration: {len(config.years)} years, {len(config.models)} models")
     logger.info(f"Output directory: {config.output_dir}")
+    logger.info(f"SQLite path: {config.sqlite_path}")
     
     # Run scraper
     try:

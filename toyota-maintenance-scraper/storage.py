@@ -9,11 +9,102 @@ Handles writing scraped data to files with:
 import json
 import csv
 import logging
+import sqlite3
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+
+
+class SQLiteStore:
+    """Lightweight SQLite persistence for exported scraper records."""
+
+    def __init__(self, db_path: Path):
+        self.db_path = db_path
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        return conn
+
+    def _init_db(self) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dataset TEXT NOT NULL,
+                    dedupe_key TEXT NOT NULL,
+                    source TEXT,
+                    model TEXT,
+                    year INTEGER,
+                    payload_json TEXT NOT NULL,
+                    inserted_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(dataset, dedupe_key)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS summaries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    written_at TEXT NOT NULL
+                )
+                """
+            )
+
+    def upsert_records(self, dataset: str, rows: List[Tuple[str, Dict[str, Any]]]) -> int:
+        if not rows:
+            return 0
+
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.executemany(
+                """
+                INSERT INTO records (dataset, dedupe_key, source, model, year, payload_json, inserted_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(dataset, dedupe_key)
+                DO UPDATE SET
+                    source=excluded.source,
+                    model=excluded.model,
+                    year=excluded.year,
+                    payload_json=excluded.payload_json,
+                    updated_at=excluded.updated_at
+                """,
+                [
+                    (
+                        dataset,
+                        dedupe_key,
+                        record.get("source"),
+                        record.get("model"),
+                        int(record["year"]) if record.get("year") is not None else None,
+                        json.dumps(record, default=str),
+                        now,
+                        now,
+                    )
+                    for dedupe_key, record in rows
+                ],
+            )
+        return len(rows)
+
+    def insert_summary(self, filename: str, data: Any) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO summaries (filename, payload_json, written_at) VALUES (?, ?, ?)",
+                (filename, json.dumps(data, default=str), datetime.now(timezone.utc).isoformat()),
+            )
+
+    def reset(self) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM records")
+            conn.execute("DELETE FROM summaries")
 
 
 class Storage:
@@ -26,10 +117,17 @@ class Storage:
     - Deduplication by configurable key
     """
     
-    def __init__(self, output_dir: str = "output"):
+    def __init__(self, output_dir: str = "output", sqlite_path: Optional[str] = "scraper.db"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._seen_keys: Dict[str, Set[str]] = {}
+
+        resolved_sqlite: Optional[Path] = None
+        if sqlite_path:
+            sqlite_candidate = Path(sqlite_path)
+            resolved_sqlite = sqlite_candidate if sqlite_candidate.is_absolute() else self.output_dir / sqlite_candidate
+
+        self.sqlite = SQLiteStore(resolved_sqlite) if resolved_sqlite else None
     
     def _get_file_path(self, filename: str) -> Path:
         """Get full path for output file."""
@@ -53,6 +151,8 @@ class Storage:
                 path.unlink()
 
         self._seen_keys.clear()
+        if self.sqlite:
+            self.sqlite.reset()
     
     def _make_key(self, record: Dict[str, Any], key_fields: List[str]) -> str:
         """Generate deduplication key from record."""
@@ -98,6 +198,7 @@ class Storage:
         
         written = 0
         skipped = 0
+        sqlite_rows: List[Tuple[str, Dict[str, Any]]] = []
         with open(filepath, mode) as f:
             for record in records:
                 # Deduplication check
@@ -108,12 +209,19 @@ class Storage:
                         logger.debug(f"Skipping duplicate: {key}")
                         continue
                     self._seen_keys[filename].add(key)
+                else:
+                    key = f"{filename}:{written}:{record.get('model', '')}:{record.get('year', '')}"
 
                 f.write(json.dumps(record, default=str) + "\n")
+                sqlite_rows.append((key, record))
                 written += 1
 
         if skipped:
             logger.info(f"Skipped {skipped} duplicate record(s) in {filepath}")
+
+        if self.sqlite and sqlite_rows:
+            self.sqlite.upsert_records(filename, sqlite_rows)
+
         logger.info(f"Wrote {written} records to {filepath}")
         return written
     
@@ -122,6 +230,8 @@ class Storage:
         filepath = self._get_file_path(filename)
         with open(filepath, "w") as f:
             json.dump(data, f, indent=2, default=str)
+        if self.sqlite:
+            self.sqlite.insert_summary(filename, data)
         logger.info(f"Wrote JSON to {filepath}")
     
     def read_jsonl(self, filename: str) -> List[Dict[str, Any]]:

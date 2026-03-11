@@ -55,6 +55,7 @@ class ScraperConfig:
     timeout: int = 30
     max_retries: int = 3
     output_dir: str = "output"
+    sqlite_path: str = "scraper.db"
     offline: bool = False
     source: List[str] = field(default_factory=list)
 
@@ -110,6 +111,7 @@ class ScraperConfig:
             timeout=int(data.get("timeout", 30)),
             max_retries=int(data.get("max_retries", 3)),
             output_dir=str(data.get("output_dir", "output")),
+            sqlite_path=str(data.get("sqlite_path", "scraper.db")),
             offline=bool(data.get("offline", False)),
             source=list(data.get("source", [])),
         )

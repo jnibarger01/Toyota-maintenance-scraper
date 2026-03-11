@@ -4,5 +4,6 @@ rate_limit = 1.0
 timeout = 30
 max_retries = 3
 output_dir = "output"
+sqlite_path = "scraper.db"
 offline = false
 source = ["toyota-pdf", "fueleconomy", "owners-manual"]

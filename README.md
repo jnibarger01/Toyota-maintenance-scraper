@@ -44,6 +44,7 @@ python toyota-maintenance-scraper/runner.py --smoke-test
 python toyota-maintenance-scraper/runner.py --models Camry RAV4 --years 2023 2024
 python toyota-maintenance-scraper/runner.py --source fueleconomy
 python toyota-maintenance-scraper/runner.py --no-resume
+python toyota-maintenance-scraper/runner.py --sqlite-path /tmp/toyota-maintenance.db
 ```
 
 ### Config file support
@@ -63,6 +64,7 @@ Example `scraper.json`:
   "timeout": 30,
   "max_retries": 3,
   "output_dir": "output",
+  "sqlite_path": "scraper.db",
   "offline": false,
   "source": ["toyota-pdf", "fueleconomy", "owners-manual"]
 }
