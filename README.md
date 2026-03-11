@@ -1,6 +1,6 @@
 # Toyota Maintenance Scraper
 
-Production-focused Toyota maintenance data scraper with CLI, checkpointing, offline fallback, and CSV/JSONL export.
+Production-focused Toyota maintenance data scraper with CLI, checkpointing, offline fallback, SQLite persistence, and CSV/JSONL export.
 
 ## Aegis (Safety & Compliance)
 
@@ -16,6 +16,15 @@ Production-focused Toyota maintenance data scraper with CLI, checkpointing, offl
   - Do not circumvent access controls.
   - Use results for research/maintenance planning, not misrepresentation of OEM guidance.
 
+## Features
+
+- Multi-source scraping (`toyota-pdf`, `fueleconomy`, `owners-manual`)
+- JSONL output with dedupe by configurable key fields
+- CSV export for analysis/spreadsheets
+- SQLite upsert storage (`dataset + dedupe_key` uniqueness)
+- Session checkpointing for resumable runs
+- Offline mode for local/fallback generation
+
 ## Project Layout
 
 - `main.py` - repository entrypoint (delegates to app runner)
@@ -23,7 +32,7 @@ Production-focused Toyota maintenance data scraper with CLI, checkpointing, offl
 - `toyota-maintenance-scraper/config.py` - models, URL patterns, config loader (JSON/TOML)
 - `toyota-maintenance-scraper/fetcher.py` - HTTP layer (rate-limit/retry)
 - `toyota-maintenance-scraper/parsers/` - source-specific parsers
-- `toyota-maintenance-scraper/storage.py` - JSONL/CSV + checkpointing
+- `toyota-maintenance-scraper/storage.py` - JSONL/CSV + SQLite + checkpointing
 - `toyota-maintenance-scraper/tests/` - unit/smoke tests
 
 ## Setup
@@ -36,25 +45,33 @@ make install
 ## Usage
 
 ```bash
-# run from repo root
+# quick smoke test (offline)
 python main.py --smoke-test --offline
 
-# run app directly
-python toyota-maintenance-scraper/runner.py --smoke-test
+# run specific models/years
 python toyota-maintenance-scraper/runner.py --models Camry RAV4 --years 2023 2024
+
+# run one source
 python toyota-maintenance-scraper/runner.py --source fueleconomy
+
+# run multiple sources (repeat --source)
+python toyota-maintenance-scraper/runner.py --source toyota-pdf --source fueleconomy
+
+# fresh run without checkpoint resume
 python toyota-maintenance-scraper/runner.py --no-resume
+
+# custom sqlite location
 python toyota-maintenance-scraper/runner.py --sqlite-path /tmp/toyota-maintenance.db
 ```
 
-### Config file support
+## Config File Support
 
 ```bash
 python main.py --config config/scraper.json
 python main.py --config config/scraper.toml --models Camry --years 2024
 ```
 
-Example `scraper.json`:
+Example `config/scraper.json`:
 
 ```json
 {
@@ -70,13 +87,14 @@ Example `scraper.json`:
 }
 ```
 
-## Output
+## Output Artifacts
 
-- `maintenance_schedules.jsonl/.csv`
-- `fueleconomy_vehicles.jsonl/.csv`
-- `service_specs.jsonl/.csv`
+- `maintenance_schedules.jsonl` / `maintenance_schedules.csv`
+- `fueleconomy_vehicles.jsonl` / `fueleconomy_vehicles.csv`
+- `service_specs.jsonl` / `service_specs.csv`
 - `scrape_summary.json`
 - `.checkpoint.json`
+- `scraper.db` (SQLite, default under output dir)
 
 ## Verification
 
