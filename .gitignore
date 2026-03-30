@@ -6,6 +6,8 @@ __pycache__/
 .venv/
 output/
 output_ci/
+output_livecheck/
+output_pdfcheck/
 output_review/
 output_test/
 toyota-maintenance-scraper/output_test/

@@ -23,88 +23,99 @@ class SQLiteStore:
     def __init__(self, db_path: Path):
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn: Optional[sqlite3.Connection] = None
         self._init_db()
 
+    def close(self) -> None:
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
+
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        return conn
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_path)
+            self._conn.execute("PRAGMA journal_mode=WAL;")
+            self._conn.execute("PRAGMA synchronous=NORMAL;")
+        return self._conn
 
     def _init_db(self) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS records (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    dataset TEXT NOT NULL,
-                    dedupe_key TEXT NOT NULL,
-                    source TEXT,
-                    model TEXT,
-                    year INTEGER,
-                    payload_json TEXT NOT NULL,
-                    inserted_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    UNIQUE(dataset, dedupe_key)
-                )
-                """
+        conn = self._connect()
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset TEXT NOT NULL,
+                dedupe_key TEXT NOT NULL,
+                source TEXT,
+                model TEXT,
+                year INTEGER,
+                payload_json TEXT NOT NULL,
+                inserted_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(dataset, dedupe_key)
             )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS summaries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    filename TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    written_at TEXT NOT NULL
-                )
-                """
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                written_at TEXT NOT NULL
             )
+            """
+        )
+        conn.commit()
 
     def upsert_records(self, dataset: str, rows: List[Tuple[str, Dict[str, Any]]]) -> int:
         if not rows:
             return 0
 
         now = datetime.now(timezone.utc).isoformat()
-        with self._connect() as conn:
-            conn.executemany(
-                """
-                INSERT INTO records (dataset, dedupe_key, source, model, year, payload_json, inserted_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(dataset, dedupe_key)
-                DO UPDATE SET
-                    source=excluded.source,
-                    model=excluded.model,
-                    year=excluded.year,
-                    payload_json=excluded.payload_json,
-                    updated_at=excluded.updated_at
-                """,
-                [
-                    (
-                        dataset,
-                        dedupe_key,
-                        record.get("source"),
-                        record.get("model"),
-                        int(record["year"]) if record.get("year") is not None else None,
-                        json.dumps(record, default=str),
-                        now,
-                        now,
-                    )
-                    for dedupe_key, record in rows
-                ],
-            )
+        conn = self._connect()
+        conn.executemany(
+            """
+            INSERT INTO records (dataset, dedupe_key, source, model, year, payload_json, inserted_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(dataset, dedupe_key)
+            DO UPDATE SET
+                source=excluded.source,
+                model=excluded.model,
+                year=excluded.year,
+                payload_json=excluded.payload_json,
+                updated_at=excluded.updated_at
+            """,
+            [
+                (
+                    dataset,
+                    dedupe_key,
+                    record.get("source"),
+                    record.get("model"),
+                    int(record["year"]) if record.get("year") is not None else None,
+                    json.dumps(record, default=str),
+                    now,
+                    now,
+                )
+                for dedupe_key, record in rows
+            ],
+        )
+        conn.commit()
         return len(rows)
 
     def insert_summary(self, filename: str, data: Any) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO summaries (filename, payload_json, written_at) VALUES (?, ?, ?)",
-                (filename, json.dumps(data, default=str), datetime.now(timezone.utc).isoformat()),
-            )
+        conn = self._connect()
+        conn.execute(
+            "INSERT INTO summaries (filename, payload_json, written_at) VALUES (?, ?, ?)",
+            (filename, json.dumps(data, default=str), datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
 
     def reset(self) -> None:
-        with self._connect() as conn:
-            conn.execute("DELETE FROM records")
-            conn.execute("DELETE FROM summaries")
+        conn = self._connect()
+        conn.execute("DELETE FROM records")
+        conn.execute("DELETE FROM summaries")
+        conn.commit()
 
 
 class Storage:
@@ -128,6 +139,16 @@ class Storage:
             resolved_sqlite = sqlite_candidate if sqlite_candidate.is_absolute() else self.output_dir / sqlite_candidate
 
         self.sqlite = SQLiteStore(resolved_sqlite) if resolved_sqlite else None
+
+    def close(self) -> None:
+        if self.sqlite:
+            self.sqlite.close()
+
+    def __enter__(self) -> "Storage":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
     
     def _get_file_path(self, filename: str) -> Path:
         """Get full path for output file."""

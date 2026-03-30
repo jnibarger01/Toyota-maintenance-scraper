@@ -38,7 +38,7 @@ Production-focused Toyota maintenance data scraper with CLI, checkpointing, offl
 ## Setup
 
 ```bash
-cd /home/jace/Toyota-maintenance-scraper
+cd /home/jnibarger/.openclaw/workspace-main/Toyota-maintenance-scraper
 make install
 ```
 
@@ -101,4 +101,5 @@ Example `config/scraper.json`:
 ```bash
 make test
 python main.py --smoke-test --offline --no-resume
+python main.py --source fueleconomy --models Camry --years 2024 --no-resume
 ```

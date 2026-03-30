@@ -251,67 +251,66 @@ def run_scraper(
     Returns:
         Summary statistics
     """
-    storage = Storage(config.output_dir, sqlite_path=config.sqlite_path)
-    checkpoint = Checkpoint(config.output_dir)
-    
-    if not resume:
-        storage.reset_files([
-            "maintenance_schedules.jsonl",
-            "maintenance_schedules.csv",
-            "fueleconomy_vehicles.jsonl",
-            "fueleconomy_vehicles.csv",
-            "service_specs.jsonl",
-            "service_specs.csv",
-            "scrape_summary.json",
-        ])
-        checkpoint.clear()
-    
-    checkpoint.start_session()
-    
-    stats = {
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "config": {
-            "years": config.years,
-            "models": config.models,
-        },
-        "results": {},
-    }
-    
-    all_sources = ["toyota-pdf", "fueleconomy", "owners-manual"]
-    active_sources = sources if sources else all_sources
-    
-    with Fetcher(
-        rate_limit=config.rate_limit,
-        timeout=config.timeout,
-        max_retries=config.max_retries,
-    ) as fetcher:
-        
-        if "toyota-pdf" in active_sources:
-            count = scrape_toyota_pdfs(config, fetcher, storage, checkpoint, offline=offline)
-            stats["results"]["toyota-pdf"] = count
-        
-        if "fueleconomy" in active_sources:
-            count = scrape_fueleconomy(config, fetcher, storage, checkpoint, offline=offline)
-            stats["results"]["fueleconomy"] = count
-        
-        if "owners-manual" in active_sources:
-            count = scrape_owners_manuals(config, storage, checkpoint)
-            stats["results"]["owners-manual"] = count
-    
-    stats["completed_at"] = datetime.now(timezone.utc).isoformat()
-    
-    # Export to CSV
-    logger.info("Exporting to CSV...")
-    for jsonl_file in ["maintenance_schedules.jsonl", "fueleconomy_vehicles.jsonl", "service_specs.jsonl"]:
-        try:
-            storage.export_to_csv(jsonl_file)
-        except Exception as e:
-            logger.warning(f"Could not export {jsonl_file}: {e}")
-    
-    # Save summary
-    storage.write_json("scrape_summary.json", stats)
-    
-    return stats
+    with Storage(config.output_dir, sqlite_path=config.sqlite_path) as storage:
+        checkpoint = Checkpoint(config.output_dir)
+
+        if not resume:
+            storage.reset_files([
+                "maintenance_schedules.jsonl",
+                "maintenance_schedules.csv",
+                "fueleconomy_vehicles.jsonl",
+                "fueleconomy_vehicles.csv",
+                "service_specs.jsonl",
+                "service_specs.csv",
+                "scrape_summary.json",
+            ])
+            checkpoint.clear()
+
+        checkpoint.start_session()
+
+        stats = {
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "config": {
+                "years": config.years,
+                "models": config.models,
+            },
+            "results": {},
+        }
+
+        all_sources = ["toyota-pdf", "fueleconomy", "owners-manual"]
+        active_sources = sources if sources else all_sources
+
+        with Fetcher(
+            rate_limit=config.rate_limit,
+            timeout=config.timeout,
+            max_retries=config.max_retries,
+        ) as fetcher:
+            if "toyota-pdf" in active_sources:
+                count = scrape_toyota_pdfs(config, fetcher, storage, checkpoint, offline=offline)
+                stats["results"]["toyota-pdf"] = count
+
+            if "fueleconomy" in active_sources:
+                count = scrape_fueleconomy(config, fetcher, storage, checkpoint, offline=offline)
+                stats["results"]["fueleconomy"] = count
+
+            if "owners-manual" in active_sources:
+                count = scrape_owners_manuals(config, storage, checkpoint)
+                stats["results"]["owners-manual"] = count
+
+        stats["completed_at"] = datetime.now(timezone.utc).isoformat()
+
+        # Export to CSV
+        logger.info("Exporting to CSV...")
+        for jsonl_file in ["maintenance_schedules.jsonl", "fueleconomy_vehicles.jsonl", "service_specs.jsonl"]:
+            try:
+                storage.export_to_csv(jsonl_file)
+            except Exception as e:
+                logger.warning(f"Could not export {jsonl_file}: {e}")
+
+        # Save summary
+        storage.write_json("scrape_summary.json", stats)
+
+        return stats
 
 
 def main():

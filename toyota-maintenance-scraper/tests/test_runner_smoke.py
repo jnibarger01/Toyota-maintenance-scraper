@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+import shutil
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -9,6 +10,12 @@ from runner import run_scraper
 
 
 class RunnerSmokeTests(unittest.TestCase):
+    def setUp(self):
+        shutil.rmtree("output_test", ignore_errors=True)
+
+    def tearDown(self):
+        shutil.rmtree("output_test", ignore_errors=True)
+
     def test_offline_smoke(self):
         cfg = ScraperConfig.smoke_test()
         cfg.output_dir = "output_test"
